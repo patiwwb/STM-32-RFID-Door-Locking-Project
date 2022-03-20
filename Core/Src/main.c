@@ -18,13 +18,14 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "spi.h"
+//#include "spi.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
-#include "rc522.h"
+//#include "rc522.h"
 #include "retarget.h"
+#include "mfrc522.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -49,6 +50,16 @@ UART_HandleTypeDef huart2;
 /* USER CODE BEGIN PV */
 uint8_t rx_buffer[20] = {0};
 flag_test = 0;
+
+uint8_t         i; //for
+uint8_t         differentRFID; //czy nowe RFID jest inne? (multiple readings protect)
+uint8_t         txBufInd;
+uint8_t         comand;
+uint8_t         txBuffer[18] = "ID: 00000000  "; //id w postaci char *
+uint8_t         retstr[10]; //powrót z funkcji konwersji hex_dec
+uint8_t         rxBuffer[8]; //ID w postacji stringu do odczytania (heksadecynalny)
+uint8_t         lastID[4]; //poprzednio wczytany ID w postaci binarnej
+uint8_t         str[MFRC522_MAX_LEN]; //aktualnie wczytany id w postaci binarnej (4 bajty, ale miejsca na 16)
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -57,7 +68,42 @@ static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_SPI1_Init(void);
 /* USER CODE BEGIN PFP */
+#include <stdio.h>
+#include <string.h>
+volatile char t[100];
+char buf_printf[100]; //max printf length
+#define printfx(f_, ...) snprintf(buf_printf, 100, (f_), ##__VA_ARGS__); \
+HAL_UART_Transmit(&huart3, (uint8_t*)buf_printf, strlen(buf_printf), 1000);
 
+
+volatile uint8_t rc522interrupt = 0; // wystąpiło przerwanie RC522 trzeba obsłużyć w loop()
+
+
+
+//FUNKCJE CZYTNIKA
+uint8_t MFRC522_Check(uint8_t* id);
+uint8_t MFRC522_Compare(uint8_t* CardID, uint8_t* CompareID);
+void MFRC522_WriteRegister(uint8_t addr, uint8_t val);
+uint8_t MFRC522_ReadRegister(uint8_t addr);
+void MFRC522_SetBitMask(uint8_t reg, uint8_t mask);
+void MFRC522_ClearBitMask(uint8_t reg, uint8_t mask);
+uint8_t MFRC522_Request(uint8_t reqMode, uint8_t* TagType);
+uint8_t MFRC522_ToCard(uint8_t command, uint8_t* sendData, uint8_t sendLen, uint8_t* backData, uint16_t* backLen);
+uint8_t MFRC522_Anticoll(uint8_t* serNum);
+void MFRC522_CalulateCRC(uint8_t* pIndata, uint8_t len, uint8_t* pOutData);
+uint8_t MFRC522_SelectTag(uint8_t* serNum);
+uint8_t MFRC522_Auth(uint8_t authMode, uint8_t BlockAddr, uint8_t* Sectorkey, uint8_t* serNum);
+uint8_t MFRC522_Read(uint8_t blockAddr, uint8_t* recvData);
+uint8_t MFRC522_Write(uint8_t blockAddr, uint8_t* writeData);
+void MFRC522_Init(void);
+void MFRC522_Reset(void);
+void MFRC522_AntennaOn(void);
+void MFRC522_AntennaOff(void);
+void MFRC522_Halt(void);
+
+//////////////
+
+void char_to_hex(uint8_t data);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -97,7 +143,7 @@ int main(void)
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
   RetargetInit(&huart2);
-  RC522_Init();
+ // RC522_Init();
   HAL_UART_Transmit(&huart2, (uint8_t *)" UART pOLLING METHOD\r\n", sizeof(" UART pOLLING METHOD\r\n"), 300);
   /* USER CODE END 2 */
 
@@ -109,16 +155,17 @@ int main(void)
 	  //	  HAL_Delay(500);
 	  //	  HAL_GPIO_WritePin(LD3_GPIO_Port,LD3_Pin, 0);
 	  //	  HAL_Delay(500);
-	  	  if(!flag_test)
-	  	  {
-	  		  HAL_UART_Transmit(&huart2,(uint8_t *) "UART2 Interrupt\r\n", sizeof("UART2 Interrupt\r\n"), 300);
-	  		  flag_test = 1;
-	  	  }
-	  	  uint8_t RC522version = MFRC522_ReadRegister(MFRC522_REG_VERSION);
-	  	  printf("RC522 Version (92 = version 2, 91 = version 1, ff = rst error): %#08x\r\n", RC522version );
-	      HAL_Delay(1000);
-	      printf("\r\nYes ");
-		  ReaderCard();
+//	  	  if(!flag_test)
+//	  	  {
+//	  		  HAL_UART_Transmit(&huart2,(uint8_t *) "UART2 Interrupt\r\n", sizeof("UART2 Interrupt\r\n"), 300);
+//	  		  flag_test = 1;
+//	  	  }
+//	  	  uint8_t RC522version = MFRC522_ReadRegister(MFRC522_REG_VERSION);
+//	  	  printf("RC522 Version (92 = version 2, 91 = version 1, ff = rst error): %#08x\r\n", RC522version );
+//	      HAL_Delay(1000);
+//	      printf("\r\nYes ");
+
+		  //ReaderCard();
 
 
 	  //	  HAL_UART_Receive(&huart2, rx_buffer,20, 300);
@@ -126,6 +173,41 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	  uint8_t RC522version = MFRC522_ReadRegister(MFRC522_REG_VERSION);
+	  printf("RC522 Version (92 = version 2, 91 = version 1, ff = rst error): %#08x\r\n", RC522version );
+	  if (!MFRC522_Request(PICC_REQIDL, str))//str - nasz klucz //PICC_REQIDL find the antenna area does not enter hibernation
+	                          {
+	                                  if (!MFRC522_Anticoll(str))//str nasz klucz[16] ANTI COLLISION
+	                                  {
+	                                          //TU ODCZYTAł nowy klucz ID
+	                                          differentRFID = 0; //bool czy kolejny wczytany klucz inny jest od poprzedniego? Tylko wtedy działaj (multiple readings)
+	                                          txBufInd = 9; //indeks w stringu od którego piszemy ID: ...
+
+	                                          for (i=0; i<4 && !differentRFID; i++)
+	                                                  if (lastID[i] != str[i])
+	                                                          differentRFID = 1; //sprawdzenie czy wczytany teraz klucz != poprzednio wczytanego
+
+	                                          if (differentRFID)
+	                                          { //to się wywołuje jeśli kod RFID jest inny nniż do tej pory
+	                                                  for (i=0; i<4; i++)
+	                                                          lastID[i] = str[i]; //zapamiętaj ostatni nowy ID w str
+	                                                  for (i=0; i<4; i++)
+	                                                  {
+	                                                          char_to_hex(str[i]); //tu zapisuje w systemie 16 klucz do stringu z formatu bitowego na liczby 16 = 4 bajty
+	                                                          txBuffer[txBufInd] = retstr[0]; //retstr to return string z funkcji char_to_hex
+	                                                          txBufInd++;
+	                                                          txBuffer[txBufInd] = retstr[1]; //retstr to return string z funkcji char_to_hex
+	                                                          txBufInd++;
+	                                                  }
+	                                                  printf("RFID: %s \n\r", (char *)txBuffer);
+	                                                  //HAL_UART_Transmit(&huart3, txBuffer, 18, 100);
+	                                          }
+
+	                                  }
+	                          }
+
+	                          HAL_Delay(10);
+
   }
   /* USER CODE END 3 */
 }
@@ -288,11 +370,29 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
   HAL_GPIO_Init(RC522_SDA_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_WritePin(GPIOB, RC522_RST_Pin, GPIO_PIN_SET); //domyślnie RESET będzie i dlatego nie działa.
 
 }
 
 /* USER CODE BEGIN 4 */
+// char number to string hex (FF) (Only big letters!)
+void char_to_hex(uint8_t data) {
+        uint8_t digits[] = {'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};
 
+        if (data < 16) {
+                retstr[0] = '0';
+                retstr[1] = digits[data];
+        } else {
+                retstr[0] = digits[(data & 0xF0)>>4];
+                retstr[1] = digits[(data & 0x0F)];
+        }
+}
+
+
+void irqHandlerRC522(void)
+{//niepodłączone
+   rc522interrupt = 1;
+}
 /* USER CODE END 4 */
 
 /**

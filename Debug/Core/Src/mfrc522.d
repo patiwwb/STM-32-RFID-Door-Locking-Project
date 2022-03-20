@@ -1,5 +1,5 @@
-Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
- ../Drivers/STM32L4xx_HAL_Driver/Inc/stm32l4xx_hal.h \
+Core/Src/mfrc522.o: ../Core/Src/mfrc522.c ../Core/Inc/mfrc522.h \
+ ../Core/Inc/main.h ../Drivers/STM32L4xx_HAL_Driver/Inc/stm32l4xx_hal.h \
  ../Core/Inc/stm32l4xx_hal_conf.h \
  ../Drivers/STM32L4xx_HAL_Driver/Inc/stm32l4xx_hal_rcc.h \
  ../Drivers/STM32L4xx_HAL_Driver/Inc/stm32l4xx_hal_def.h \
@@ -28,8 +28,9 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
  ../Drivers/STM32L4xx_HAL_Driver/Inc/stm32l4xx_hal_spi.h \
  ../Drivers/STM32L4xx_HAL_Driver/Inc/stm32l4xx_hal_spi_ex.h \
  ../Drivers/STM32L4xx_HAL_Driver/Inc/stm32l4xx_hal_uart.h \
- ../Drivers/STM32L4xx_HAL_Driver/Inc/stm32l4xx_hal_uart_ex.h \
- ../Core/Inc/retarget.h ../Core/Inc/mfrc522.h ../Core/Inc/main.h
+ ../Drivers/STM32L4xx_HAL_Driver/Inc/stm32l4xx_hal_uart_ex.h
+
+../Core/Inc/mfrc522.h:
 
 ../Core/Inc/main.h:
 
@@ -92,9 +93,3 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
 ../Drivers/STM32L4xx_HAL_Driver/Inc/stm32l4xx_hal_uart.h:
 
 ../Drivers/STM32L4xx_HAL_Driver/Inc/stm32l4xx_hal_uart_ex.h:
-
-../Core/Inc/retarget.h:
-
-../Core/Inc/mfrc522.h:
-
-../Core/Inc/main.h:
