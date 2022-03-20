@@ -1,0 +1,15 @@
+rc522.c:16:6:RC522_Init	8	static
+rc522.c:34:6:delay_ns	24	static,ignoring_inline_asm
+rc522.c:55:6:RC522_ReadWriteByte	16	static
+rc522.c:73:15:ReadRawRC	24	static
+rc522.c:93:6:WriteRawRC	24	static
+rc522.c:111:6:SetBitMask	24	static
+rc522.c:123:6:ClearBitMask	24	static
+rc522.c:134:6:PcdReset	8	static
+rc522.c:155:6:MF522PcdConfigISOType	16	static
+rc522.c:178:6:PcdAntennaOn	16	static
+rc522.c:193:6:PcdAntennaOff	8	static
+rc522.c:206:6:PcdComMF522	48	static
+rc522.c:290:6:PcdRequest	56	static
+rc522.c:318:6:PcdAnticoll	56	static
+rc522.c:355:6:ReaderCard	24	static
